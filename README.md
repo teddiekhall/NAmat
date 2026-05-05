@@ -16,11 +16,11 @@ bounds = [0 5; 0 5];
 
 % Define struct for additional objective function arguments
 args.x = x;
-args.y = y_noise;
+args.y = y;
 
-% Define RMSE as the objective function
+% Define objective function
 function output = obj_fn(in, args) 
-    pred = in(1) + in(2) * sin(args.x);
+    pred = args.x * in';
     output = rmse(pred, args.y);
 end
 
