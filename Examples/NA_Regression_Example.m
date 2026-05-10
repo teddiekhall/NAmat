@@ -1,4 +1,5 @@
 clear all; close all; clc;
+addpath(genpath('..\NAmat'));
 
 % Sine Wave Example Function
 beta1 = 1.3;
@@ -80,11 +81,10 @@ hold off;
 
 n_resample = 1000;
 n_walkers = 1;
-verbose = false;
 starting_frac = 0.5;
 save = true;
 
-naa = NAAppraiser(n_resample, n_walkers, nas, verbose, seed);
+naa = NAAppraiser(n_resample, n_walkers, nas, seed);
 naa.run(save, starting_frac);
 mean = naa.mean
 mean_err = naa.sample_mean_error

@@ -39,12 +39,11 @@ nas.run(false);
 % Appraiser arguments
 n_resample = 1000;
 n_walkers = 1;
-verbose = false;
 starting_frac = 0.5;
 save = true;
 
 % Initialize and run NAAppraiser object
-naa = NAAppraiser(n_resample, n_walkers, nas, verbose, seed);
+naa = NAAppraiser(n_resample, n_walkers, nas, seed);
 naa.run(save, starting_frac);
 
 % Retrieve estimates
