@@ -122,6 +122,8 @@ classdef NASearcher < handle
         end
 
         function run_serial(obj, iter, inds, cells_to_resample)
+            % Run each search iteration in serial
+            
             for i = 1:obj.nr
                 stream_num = (iter - 1) * obj.nr + i;
                 new_samples = obj.random_walk_in_voronoi( ...
@@ -131,8 +133,10 @@ classdef NASearcher < handle
         end
 
         function run_parallel(obj, iter, inds, cells_to_resample)
-            % cell to collect arrays to account for classification
-            % error in parfor loop
+            % Run each search iteration in parallel
+            
+            % cell data structure to collect arrays to account for 
+            % classification error in parfor loop
             samp_parts = cell(obj.nr,1);
 
             parfor i = 1:obj.nr
