@@ -18,7 +18,6 @@ classdef NAAppraiser < handle
     % lower: column vector, lower bounds of the search space.
     % upper: column vector, upper bounds of the search space.
     % Cm: column vector, diagonal prior covariance matrix.
-    % verbose: Boolean, whether to display the progress bar.
     % Ne: int, length of the initial ensemble.
     % j: int, number of walkers.
     % nr: int, number of cells to resample per walker (if in parallel). 
@@ -37,7 +36,6 @@ classdef NAAppraiser < handle
         lower
         upper
         Cm
-        verbose = true
         Ne
         j
         nr
@@ -51,7 +49,7 @@ classdef NAAppraiser < handle
 
     methods
         function obj = NAAppraiser(n_resample, n_walkers, searcher, ...
-                verbose, seed, initial_ensemble, log_ppd, bounds)
+                seed, initial_ensemble, log_ppd, bounds)
             % Constructor for the NAAppraiser class
             
             if nargin > 0
@@ -59,7 +57,6 @@ classdef NAAppraiser < handle
                     initial_ensemble = searcher.samples;
                     log_ppd = searcher.objectives .* (-1);
                     bounds = searcher.bounds;
-                    verbose = false;
                 end
                 if isempty(seed)
                     seed = 42;
@@ -71,7 +68,6 @@ classdef NAAppraiser < handle
                 obj.lower = bounds(:, 1);
                 obj.upper = bounds(:, 2);
                 obj.Cm = ((obj.upper - obj.lower).^(-2));
-                obj.verbose = verbose;
 
                 obj.Ne = size(initial_ensemble, 1);
                 obj.nr = floorDiv(n_resample, n_walkers);
@@ -88,7 +84,7 @@ classdef NAAppraiser < handle
         function run(obj, save, start_fraction)
             % Runs the appraisal phase 
             
-            if obj.j == 1
+            if obj.j == 1 || ~canUseParallelPool
                 accumulator = obj.run_serial(save);
             else
                 if start_fraction < 0 || start_fraction > 1
@@ -131,44 +127,35 @@ classdef NAAppraiser < handle
                 save = true;
             end
             
-            % Select start points for random walks 
-            % Taken from the best start_fraction*100% of cells to avoid
-            % walking in low probability regions
-            int_threshold = int16(obj.Ne * start_fraction);
+            % Set number of parallel workers
+            num_workers = min(obj.j, maxNumCompThreads);
+
+            % Select start points for random walks from the best start_fraction*100% 
+            % of cells to avoid walking in low probability regions
+            int_threshold = floor(obj.Ne * start_fraction);
             [~, largest_log_ppd] = maxk(obj.log_ppd, int_threshold);
             start_points = largest_log_ppd(randperm(numel(largest_log_ppd), obj.j));
-            
+
             % Ensure at least one walker starts at the best cell
             [~, start] = max(obj.log_ppd);
             start_points(1) = start;
 
-            % accumulators = createArray(obj.j, 1, Like=MCIntegrals(obj.nd, save));
-            accumulators = [];
+            accumulators = createArray(obj.j, 1, Like=MCIntegrals(obj.nd, save));
 
-            % in parallel, run appraise() on all combos of accumulators,
-            % rngs, and start_points
-            params = combinations(1:obj.j, 1:obj.nr);
-            % need empty vector of length nr*#params
-            % will initialize new MCI object in the loop, accumulate there
-            % (check if MCI has updated)
-            % add new MCI object to the list 
-            % accumulate the MCIs in the list to the 
-            for rng = 1:obj.nr
-                for i = 1:size(params, 1)
+            parfor (k = 1:obj.j, num_workers)
                     acc = MCIntegrals(obj.nd, save);
-                    k = params{i, 2};
-                    obj.appraise(acc, rng, start_points(k)); 
-                    accumulators = [accumulators; acc];
-                end
+                    accumulators(k) =  obj.appraise(acc, k, start_points(k));
             end
 
             % Combine the results
             accumulator = MCIntegrals(obj.nd, save);
             for i = 1:obj.j
                 acc = accumulators(i);
-                acc.samples
                 accumulator.accumulate(acc);
             end
+
+            % Close parallel pool
+            delete(gcp('nocreate'));
         end
 
         function accumulator = appraise(obj, accumulator, rng, start_k)
@@ -177,7 +164,7 @@ classdef NAAppraiser < handle
             
             xA = obj.random_walk_through_parameter_space(rng, start_k);
             for i = 1:size(xA, 1) 
-                accumulator.accumulate(xA(i));
+                accumulator.accumulate(xA(i, :));
             end
         end
 
@@ -188,10 +175,7 @@ classdef NAAppraiser < handle
             
             obj.rngs.Substream = rng;
             
-            % Display progress bar
-            if obj.verbose 
-                wb = waitbar(0, "NAII - Random Walk");
-            end
+            wb = waitbar(0, "NA Appraisal - Random Walk");
 
             new_samples = zeros(obj.nr, obj.nd);
             xA = obj.initial_ensemble(start_k, :);
@@ -204,10 +188,13 @@ classdef NAAppraiser < handle
                     xA(i) = xpi;
                 end
                 new_samples(iter, :) = xA;
-                if obj.verbose
-                    waitbar(iter/obj.nr, wb, "NAII - Random Walk");
-                end
+
+                % Update progress bar
+                waitbar(iter/obj.nr, wb, "NA Appraisal - Random Walk")
             end
+
+            % Close progress bar
+            close(wb)
         end
 
         function [intersections, cells] = axis_intersections(obj, axis, xA)

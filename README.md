@@ -4,7 +4,7 @@
 
 ## Installation
 
-Instructions for package installation to be added.
+NAmat currently consists of the root files, so the repository must be cloned locally to be used. Instructions for installation will be added once it is turned into a package.
 
 ## Basic Usage
 
