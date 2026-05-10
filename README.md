@@ -4,7 +4,7 @@
 
 ## Installation
 
-NAmat currently consists of the root files, so the repository must be cloned locally to be used. Instructions for installation will be added once it is turned into a package.
+``NAmat`` is packaged as a MATLAB toolbox and can be installed to your MATLAB environment by downloading the ``NAmat.mltbx`` file and executing the file. 
 
 ## Basic Usage
 
